@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Verity Run — 3D Runner</title>
+<style>
+  :root{color-scheme:dark;--ink:#f7f6ee;--muted:#b8c6d0;--lime:#dfff57;--glass:rgba(8,18,29,.72)}
+  *{box-sizing:border-box} html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#071522;font-family:Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,sans-serif;color:var(--ink)}
+  #game{position:fixed;inset:0} canvas{display:block;width:100%;height:100%}
+  .hud{position:fixed;inset:0;pointer-events:none;padding:clamp(14px,3vw,30px);display:flex;flex-direction:column;justify-content:space-between}
+  .top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+  .brand{display:flex;gap:12px;align-items:center}.mark{width:42px;height:42px;border-radius:14px;background:var(--lime);display:grid;place-items:center;color:#13202a;font-size:24px;box-shadow:0 0 34px #dfff5735}
+  .eyebrow{font-size:10px;letter-spacing:.23em;color:var(--lime);font-weight:800}.name{font-size:clamp(20px,3vw,29px);font-weight:900;letter-spacing:-.05em;line-height:1.05;margin-top:3px}
+  .stats{display:flex;gap:9px}.stat{min-width:83px;padding:11px 14px;border:1px solid #ffffff1b;background:var(--glass);backdrop-filter:blur(12px);border-radius:14px}.stat small{display:block;font-size:9px;letter-spacing:.18em;color:var(--muted);font-weight:800}.stat strong{display:block;font-size:22px;line-height:1.2;font-variant-numeric:tabular-nums}
+  .bottom{display:flex;justify-content:space-between;align-items:flex-end;gap:16px}.hint{background:var(--glass);border:1px solid #ffffff1b;backdrop-filter:blur(12px);border-radius:14px;padding:12px 15px;color:var(--muted);font-size:12px;line-height:1.6}.key{display:inline-grid;place-items:center;border:1px solid #ffffff45;background:#ffffff10;border-radius:5px;color:white;font-weight:900;min-width:23px;padding:1px 5px;margin:0 2px}
+  .progress{width:min(240px,28vw);height:4px;border-radius:10px;background:#ffffff20;overflow:hidden;margin-top:9px}.progress span{display:block;height:100%;width:0;background:var(--lime);transition:width .15s}
+  
+  #army-counter{position:fixed;transform:translate(-50%,-100%);background:rgba(0,170,255,0.85);color:#fff;padding:6px 14px;border-radius:20px;font-weight:900;font-size:18px;letter-spacing:.05em;box-shadow:0 0 20px rgba(0,170,255,0.6);pointer-events:none;z-index:2;transition:transform .1s;border:2px solid #fff}
+  #enemy-counter{position:fixed;transform:translate(-50%,-100%);background:rgba(220,20,20,0.9);color:#fff;padding:6px 14px;border-radius:20px;font-weight:900;font-size:18px;letter-spacing:.05em;box-shadow:0 0 20px rgba(255,50,50,0.8);pointer-events:none;z-index:2;transition:transform .1s;border:2px solid #fff}
+
+  .overlay{position:fixed;inset:0;display:grid;place-items:center;background:linear-gradient(180deg,#07152233,#071522b5);padding:20px;z-index:4}
+  .panel{width:min(440px,100%);padding:clamp(25px,5vw,42px);border:1px solid #ffffff25;border-radius:25px;background:linear-gradient(145deg,#10293bF2,#071521F5);box-shadow:0 30px 100px #0008;text-align:center}
+  .orb{width:82px;height:82px;margin:0 auto 22px;border-radius:50%;background:radial-gradient(circle at 32% 25%,#fff6a6,#ffda24 50%,#e99d00 100%);box-shadow:0 0 60px #ffca2b38;position:relative}.orb:before{content:"••";white-space:pre;position:absolute;top:20px;left:20px;font-size:25px;letter-spacing:12px;color:#18222b}.orb:after{content:"";position:absolute;left:27px;top:42px;width:29px;height:13px;border-bottom:4px solid #18222b;border-radius:0 0 50% 50%}
+  .panel h1{font-size:clamp(30px,7vw,43px);line-height:1;letter-spacing:-.06em;margin:0 0 12px}.panel p{color:#b7c8d4;line-height:1.6;font-size:14px;margin:0 auto 24px;max-width:315px}.accent{color:var(--lime)}
+  button{font:inherit;cursor:pointer;border:0}.primary{pointer-events:auto;background:var(--lime);color:#111d24;font-weight:950;letter-spacing:.08em;text-transform:uppercase;padding:15px 24px;border-radius:12px;min-width:180px;box-shadow:0 7px 0 #91a92e;transition:transform .1s,box-shadow .1s}.primary:active{transform:translateY(4px);box-shadow:0 3px 0 #91a92e}
+  .mobile{display:none;position:fixed;bottom:25px;left:0;right:0;justify-content:space-between;padding:0 25px;pointer-events:none;z-index:3}.move{pointer-events:auto;width:62px;height:62px;border-radius:20px;background:#071522aa;border:1px solid #ffffff4a;color:white;font-size:25px;backdrop-filter:blur(8px);touch-action:none}
+  #toast{position:fixed;left:50%;top:24%;transform:translate(-50%,-10px);font-weight:900;letter-spacing:.12em;color:var(--lime);opacity:0;transition:.25s;pointer-events:none;text-shadow:0 3px 18px #000}
+  @media(max-width:620px){.stats{gap:6px}.stat{min-width:66px;padding:9px}.stat strong{font-size:18px}.stat small{font-size:8px}.hint{font-size:10px;padding:9px 11px}.mobile{display:flex}.bottom{padding-bottom:85px}}
+</style>
+</head>
+<body>
+<div id="game"></div>
+<div id="army-counter">1</div>
+<div id="enemy-counter" style="display:none;">0</div>
+<div class="hud">
+  <div class="top">
+    <div class="brand"><div class="mark">✦</div><div><div class="eyebrow">MINECRAFT-INSPIRED ARCADE</div><div class="name">VERITY <span style="color:var(--lime)">RUN</span></div></div></div>
+    <div class="stats"><div class="stat"><small>DISTANCE</small><strong id="distance">0000</strong></div><div class="stat"><small>BEST</small><strong id="best">0000</strong></div></div>
+  </div>
+  <div class="bottom">
+    <div class="hint"><span class="key">A</span> MOVE LEFT &nbsp; <span class="key">D</span> MOVE RIGHT<br>Fight Tung Tung Sahur & grow your army!<div class="progress"><span id="bar"></span></div></div>
+    <div class="stat"><small>RUN SPEED</small><strong id="speed">1.0×</strong></div>
+  </div>
+</div>
+<div id="toast">FIGHT START!</div>
+<div class="mobile"><button class="move" id="left" aria-label="Move left">←</button><button class="move" id="right" aria-label="Move right">→</button></div>
+<div class="overlay" id="overlay"><div class="panel"><div class="orb"></div><div class="eyebrow">READY, RUNNER?</div><h1>Defeat Tung<br><span class="accent">Tung Sahur.</span></h1><p>Navigate continuous gates, battle balanced Tung Tung Sahur armies, and keep your army above 0!</p><button class="primary" id="start">Start running ↗</button><p style="font-size:11px;margin:18px 0 0;color:#7f97a8">KEYBOARD A / D · TOUCH CONTROLS ON MOBILE</p></div></div>
+
+<script type="module">
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
+
+const mount=document.querySelector('#game');
+const scene=new THREE.Scene(); scene.background=new THREE.Color('#91c9d7'); scene.fog=new THREE.Fog('#91c9d7',24,100);
+const camera=new THREE.PerspectiveCamera(58,innerWidth/innerHeight,.1,180);
+camera.position.set(0,5.8,12.5); camera.lookAt(0,1.2,-5);
+const renderer=new THREE.WebGLRenderer({antialias:true, powerPreference:'high-performance'});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2)); renderer.setSize(innerWidth,innerHeight); renderer.shadowMap.enabled=true; renderer.shadowMap.type=THREE.PCFSoftShadowMap; renderer.outputColorSpace=THREE.SRGBColorSpace; renderer.toneMapping=THREE.ACESFilmicToneMapping; renderer.toneMappingExposure=1.15; mount.appendChild(renderer.domElement);
+
+scene.add(new THREE.HemisphereLight(0xdff7ff,0x253746,2.1));
+const sun=new THREE.DirectionalLight(0xfff4d4,3.0);sun.position.set(-5,12,8);sun.castShadow=true;sun.shadow.mapSize.set(1024,1024);scene.add(sun);
+
+const mat=(color,roughness=.78,metalness=0)=>new THREE.MeshStandardMaterial({color,roughness,metalness});
+const roadMat=mat('#243a4a'), edgeMat=mat('#dfff57'), tileMat=mat('#314b5b'), white=mat('#fffdf3'), dark=mat('#17212a',.4);
+const floor=new THREE.Mesh(new THREE.PlaneGeometry(200,200),mat('#172b38'));floor.rotation.x=-Math.PI/2;floor.position.y=-.13;floor.position.z=-35;floor.receiveShadow=true;scene.add(floor);
+const road=new THREE.Mesh(new THREE.PlaneGeometry(10,130),roadMat);road.rotation.x=-Math.PI/2;road.position.set(0,-.08,-43);road.receiveShadow=true;scene.add(road);
+for(const x of [-5.05,5.05]){const e=new THREE.Mesh(new THREE.BoxGeometry(.12,.05,130),edgeMat);e.position.set(x,-.01,-43);scene.add(e)}
+const stripes=[];
+for(let z=12;z>-100;z-=5){const g=new THREE.Group();for(const x of [-1.7,1.7]){const s=new THREE.Mesh(new THREE.BoxGeometry(.055,.025,2.0),tileMat);s.position.set(x,-.045,0);g.add(s)}g.position.z=z;scene.add(g);stripes.push(g)}
+
+// Distant low-poly skyline
+const city=new THREE.Group();scene.add(city);
+for(let i=0;i<34;i++){let side=i%2?1:-1;let h=1.5+Math.random()*6,w=.7+Math.random()*1.8;let b=new THREE.Mesh(new THREE.BoxGeometry(w,h,w),mat(i%3?'#648f9a':'#83aeb2'));b.position.set(side*(7+Math.random()*12),h/2,-8-Math.random()*75);city.add(b)}
+
+// Shared geometries and materials for Verity
+const sharedSphereGeo = new THREE.SphereGeometry(.38, 16, 12);
+const sharedSphereMat = new THREE.MeshStandardMaterial({color:'#ffd52a', roughness:.26, metalness:.04});
+const sharedEyeGeo = new THREE.SphereGeometry(.048, 8, 6);
+const sharedGlintGeo = new THREE.SphereGeometry(.013, 6, 6);
+const sharedSmileGeo = new THREE.TorusGeometry(.1, .016, 6, 10, Math.PI);
+const sharedWrinkleGeo = new THREE.CylinderGeometry(.005, .005, .04, 4);
+
+function createSingleVerity() {
+  const group = new THREE.Group();
+  const sphere = new THREE.Mesh(sharedSphereGeo, sharedSphereMat);
+  sphere.castShadow = true;
+  group.add(sphere);
+
+  const face = new THREE.Group();
+  face.position.set(0, .015, .36);
+  group.add(face);
+
+  function eye(x, y) {
+    const e = new THREE.Mesh(sharedEyeGeo, dark);
+    e.position.set(x, y, 0);
+    e.scale.set(1, 1.12, .55);
+    face.add(e);
+    const glint = new THREE.Mesh(sharedGlintGeo, white);
+    glint.position.set(x - .011, y + .014, .02);
+    face.add(glint);
+  }
+  eye(-.11, .08); eye(.11, .08);
+
+  const smile = new THREE.Mesh(sharedSmileGeo, dark);
+  smile.rotation.z = Math.PI;
+  smile.position.set(0, -.07, .005);
+  face.add(smile);
+
+  for (const x of [-.14, .14]) {
+    const wrinkle = new THREE.Mesh(sharedWrinkleGeo, dark);
+    wrinkle.position.set(x, -.07, .007);
+    wrinkle.rotation.z = x > 0 ? .35 : -.35;
+    face.add(wrinkle);
+  }
+
+  return group;
+}
+
+// Verity Army & Object Pool Setup (Visually capped at 150)
+const verityArmyGroup = new THREE.Group();
+scene.add(verityArmyGroup);
+verityArmyGroup.position.set(0, 1.05, 4.0);
+
+const MAX_POOL = 150;
+const verityPool = [];
+for(let i = 0; i < MAX_POOL; i++) {
+  const v = createSingleVerity();
+  v.visible = false;
+  verityArmyGroup.add(v);
+  verityPool.push(v);
+}
+
+// Collective army blue outline ring
+const armyOutlineRing = new THREE.Mesh(
+  new THREE.RingGeometry(.9, .98, 32),
+  new THREE.MeshBasicMaterial({color: '#00aaff', side: THREE.DoubleSide, transparent: true, opacity: 0.85})
+);
+armyOutlineRing.rotation.x = -Math.PI / 2;
+armyOutlineRing.position.y = -0.38;
+verityArmyGroup.add(armyOutlineRing);
+
+let verityCount = 1;
+function updateArmyMeshes() {
+  const visualCount = Math.min(verityCount, MAX_POOL);
+  for(let i = 0; i < MAX_POOL; i++) {
+    if(i < visualCount) {
+      verityPool[i].visible = true;
+      if(i === 0) {
+        verityPool[i].position.set(0, 0, 0);
+      } else {
+        const angle = i * 2.3996;
+        const radius = 0.42 * Math.sqrt(i);
+        verityPool[i].position.set(Math.cos(angle) * radius, 0, Math.sin(angle) * radius);
+        verityPool[i].scale.setScalar(0.85);
+      }
+    } else {
+      verityPool[i].visible = false;
+    }
+  }
+  const outlineScale = 0.6 + 0.38 * Math.sqrt(visualCount);
+  armyOutlineRing.scale.set(outlineScale, outlineScale, 1);
+}
+updateArmyMeshes();
+
+const shadow = new THREE.Mesh(new THREE.CircleGeometry(1.2, 32), new THREE.MeshBasicMaterial({color:'#07131b', transparent:true, opacity:.35}));
+shadow.rotation.x = -Math.PI/2;
+shadow.position.set(0, -.025, 4);
+scene.add(shadow);
+
+// Tung Tung Sahur Geometries & Materials
+const woodMat = mat('#8b5a2b', 0.8, 0.0);
+const headMat = mat('#a07855', 0.8, 0.0);
+const batMat = mat('#5c4033', 0.7, 0.0);
+
+const sahurTorsoGeo = new THREE.CylinderGeometry(0.18, 0.22, 1.8, 6);
+const sahurHeadGeo = new THREE.BoxGeometry(0.38, 0.38, 0.38);
+const sahurLimbsGeo = new THREE.CylinderGeometry(0.05, 0.05, 1.2, 4);
+const sahurBatGeo = new THREE.CylinderGeometry(0.06, 0.09, 1.1, 5);
+
+function createSingleSahur() {
+  const group = new THREE.Group();
+  
+  const torso = new THREE.Mesh(sahurTorsoGeo, woodMat);
+  torso.position.y = 0.9;
+  torso.castShadow = true;
+  group.add(torso);
+
+  const head = new THREE.Mesh(sahurHeadGeo, headMat);
+  head.position.y = 2.0;
+  head.castShadow = true;
+  group.add(head);
+
+  const arm1 = new THREE.Mesh(sahurLimbsGeo, woodMat);
+  arm1.position.set(-0.3, 1.1, 0);
+  arm1.rotation.z = 0.2;
+  group.add(arm1);
+
+  const arm2 = new THREE.Mesh(sahurLimbsGeo, woodMat);
+  arm2.position.set(0.3, 1.1, 0);
+  arm2.rotation.z = -0.2;
+  group.add(arm2);
+
+  const leg1 = new THREE.Mesh(sahurLimbsGeo, woodMat);
+  leg1.position.set(-0.12, -0.3, 0);
+  group.add(leg1);
+
+  const leg2 = new THREE.Mesh(sahurLimbsGeo, woodMat);
+  leg2.position.set(0.12, -0.3, 0);
+  group.add(leg2);
+
+  const bat = new THREE.Mesh(sahurBatGeo, batMat);
+  bat.position.set(0.5, 0.9, 0.2);
+  bat.rotation.x = Math.PI / 3;
+  group.add(bat);
+
+  return group;
+}
+
+// Gates & Enemies setup
+const gates = [];
+const enemies = [];
+let totalEncountersSpawned = 0;
+let consecutiveEnemies = 0;
+let activeCombatEnemy = null;
+let combatTimer = 0;
+
+function createGateTexture(text, isPositive) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 256; canvas.height = 128;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = isPositive ? 'rgba(0, 120, 255, 0.45)' : 'rgba(255, 50, 50, 0.45)';
+  ctx.fillRect(0, 0, 256, 128);
+  ctx.strokeStyle = isPositive ? '#00aaff' : '#ff4444';
+  ctx.lineWidth = 10;
+  ctx.strokeRect(0, 0, 256, 128);
+  ctx.fillStyle = '#ffffff';
+  ctx.font = 'bold 54px Inter, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(text, 128, 64);
+  return new THREE.CanvasTexture(canvas);
+}
+
+function getRandomPositiveOp() {
+  if(Math.random() < 0.75) {
+    const val = Math.floor(Math.random() * 4) + 2;
+    return { text: '+' + val, type: 'add', val: val, positive: true };
+  } else {
+    return { text: '×2', type: 'mul', val: 2, positive: true };
+  }
+}
+
+function getRandomNegativeOp() {
+  if(Math.random() < 0.75) {
+    const val = Math.floor(Math.random() * 3) + 2;
+    return { text: '-' + val, type: 'sub', val: val, positive: false };
+  } else {
+    return { text: '÷2', type: 'div', val: 2, positive: false };
+  }
+}
+
+function makeGatePair() {
+  const zPos = -65;
+  const group = new THREE.Group();
+  const leftOp = getRandomPositiveOp();
+  const rightOp = getRandomNegativeOp();
+  const flip = Math.random() > 0.5;
+  const op1 = flip ? rightOp : leftOp;
+  const op2 = flip ? leftOp : rightOp;
+
+  function buildSingleGate(xOffset, op) {
+    const sub = new THREE.Group();
+    sub.position.x = xOffset;
+    const postMat = mat(op.positive ? '#0077ff' : '#cc2222');
+    const p1 = new THREE.Mesh(new THREE.CylinderGeometry(.12, .12, 3.2, 12), postMat);
+    p1.position.set(-2.5, 1.6, 0); p1.castShadow = true; sub.add(p1);
+    const p2 = new THREE.Mesh(new THREE.CylinderGeometry(.12, .12, 3.2, 12), postMat);
+    p2.position.set(2.5, 1.6, 0); p2.castShadow = true; sub.add(p2);
+    const topBar = new THREE.Mesh(new THREE.BoxGeometry(5.2, .24, .24), postMat);
+    topBar.position.set(0, 3.2, 0); sub.add(topBar);
+
+    const tex = createGateTexture(op.text, op.positive);
+    const panelMat = new THREE.MeshBasicMaterial({map: tex, transparent: true, side: THREE.DoubleSide});
+    const panel = new THREE.Mesh(new THREE.PlaneGeometry(5.0, 3.0), panelMat);
+    panel.position.set(0, 1.6, 0);
+    sub.add(panel);
+    sub.userData = { op };
+    return sub;
+  }
+
+  group.add(buildSingleGate(-2.5, op1));
+  group.add(buildSingleGate(2.5, op2));
+  group.position.z = zPos;
+  scene.add(group);
+  gates.push(group);
+}
+
+function makeEnemy() {
+  const group = new THREE.Group();
+  
+  const baseCount = Math.floor(Math.random() * 6) + 5; 
+  const distanceScaling = Math.floor(distance * 0.05);
+  const enemyCount = baseCount + distanceScaling;
+  
+  const visualCount = Math.min(enemyCount, 50);
+
+  const sahurPool = [];
+  for(let i = 0; i < visualCount; i++) {
+    const sahur = createSingleSahur();
+    if(i === 0) {
+      sahur.position.set(0, 0, 0);
+    } else {
+      const angle = i * 2.3996;
+      const radius = 0.45 * Math.sqrt(i);
+      sahur.position.set(Math.cos(angle) * radius, 0, Math.sin(angle) * radius);
+      sahur.scale.setScalar(0.9);
+    }
+    group.add(sahur);
+    sahurPool.push(sahur);
+  }
+
+  const redRing = new THREE.Mesh(
+    new THREE.RingGeometry(.9, .98, 32),
+    new THREE.MeshBasicMaterial({color: '#ff3333', side: THREE.DoubleSide, transparent: true, opacity: 0.85})
+  );
+  redRing.rotation.x = -Math.PI / 2;
+  redRing.position.y = 0.02;
+  group.add(redRing);
+
+  group.position.set(0, 0, -65);
+  group.userData = { enemyCount, sahurPool, redRing, triggered: false };
+  scene.add(group);
+  enemies.push(group);
+}
+
+function updateEnemyArmy(en) {
+  const visualCount = Math.min(en.userData.enemyCount, 50);
+  while(en.userData.sahurPool.length < visualCount) {
+    const sahur = createSingleSahur();
+    const i = en.userData.sahurPool.length;
+    const angle = i * 2.3996;
+    const radius = 0.45 * Math.sqrt(i);
+    sahur.position.set(Math.cos(angle) * radius, 0, Math.sin(angle) * radius);
+    sahur.scale.setScalar(0.9);
+    en.add(sahur);
+    en.userData.sahurPool.push(sahur);
+  }
+  for(let i = 0; i < en.userData.sahurPool.length; i++) {
+    en.userData.sahurPool[i].visible = i < visualCount;
+  }
+  const outlineScale = 0.6 + 0.38 * Math.sqrt(visualCount);
+  en.userData.redRing.scale.set(outlineScale, outlineScale, 1);
+}
+
+function clearObstacles() {
+  for(const g of gates) scene.remove(g);
+  gates.length = 0;
+  for(const e of enemies) scene.remove(e);
+  enemies.length = 0;
+  activeCombatEnemy = null;
+}
+
+let running=false, over=false, elapsed=0, distance=0, best=Number(localStorage.getItem('verityBest')||0), spawn=0, velocity=0;
+document.querySelector('#best').textContent=String(best).padStart(4,'0');
+const overlay=document.querySelector('#overlay'), startBtn=document.querySelector('#start');
+
+function reset(){
+  clearObstacles();
+  elapsed=0; distance=0; spawn=1.0; velocity=0;
+  totalEncountersSpawned = 0;
+  consecutiveEnemies = 0;
+  activeCombatEnemy = null;
+  verityArmyGroup.position.x=0;
+  verityCount=1;
+  updateArmyMeshes();
+  over=false; running=true;
+  overlay.style.display='none';
+  document.querySelector('#distance').textContent='0000';
+  document.querySelector('#bar').style.width='0%';
+}
+
+function endGame(){
+  running=false; over=true;
+  activeCombatEnemy = null;
+  best=Math.max(best,Math.floor(distance));
+  localStorage.setItem('verityBest',best);
+  document.querySelector('#best').textContent=String(best).padStart(4,'0');
+  overlay.style.display='grid';
+  overlay.querySelector('.eyebrow').textContent='RUN ENDED · '+Math.floor(distance)+' M';
+  overlay.querySelector('h1').innerHTML='Army wiped<br><span class="accent">out?</span>';
+  overlay.querySelector('p').textContent='You reached an army size of '+verityCount+' and traveled '+Math.floor(distance)+' meters. Try again!';
+  startBtn.textContent='Run it back ↗';
+}
+startBtn.addEventListener('click',reset);
+
+const keys={a:false,d:false};
+function keyDown(e){const k=e.key.toLowerCase();if(k==='a'||k==='d'){e.preventDefault();keys[k]=true}if((k===' '||k==='enter')&&!running){e.preventDefault();reset()}}
+function keyUp(e){const k=e.key.toLowerCase();if(k==='a'||k==='d')keys[k]=false}
+addEventListener('keydown',keyDown);addEventListener('keyup',keyUp);addEventListener('blur',()=>{keys.a=false;keys.d=false});
+
+function bindHold(id,key){const el=document.querySelector(id);const down=e=>{e.preventDefault();keys[key]=true};const up=e=>{e.preventDefault();keys[key]=false};el.addEventListener('pointerdown',down);el.addEventListener('pointerup',up);el.addEventListener('pointercancel',up);el.addEventListener('pointerleave',up)}
+bindHold('#left','a');bindHold('#right','d');
+
+const clock=new THREE.Clock();
+
+function animate(){
+  requestAnimationFrame(animate);
+  let dt=Math.min(clock.getDelta(),.04);
+
+  if(running){
+    if(activeCombatEnemy) {
+      combatTimer += dt;
+      if(combatTimer > 0.12) {
+        combatTimer = 0;
+        if(activeCombatEnemy.userData.enemyCount > 0 && verityCount > 0) {
+          activeCombatEnemy.userData.enemyCount--;
+          verityCount--;
+          updateArmyMeshes();
+          updateEnemyArmy(activeCombatEnemy);
+        }
+
+        if(activeCombatEnemy.userData.enemyCount <= 0) {
+          scene.remove(activeCombatEnemy);
+          const idx = enemies.indexOf(activeCombatEnemy);
+          if(idx > -1) enemies.splice(idx, 1);
+          activeCombatEnemy = null;
+          const t = document.querySelector('#toast');
+          t.textContent = "ENEMY DEFEATED!";
+          t.style.opacity = 1;
+          t.style.transform = 'translate(-50%,0)';
+          setTimeout(()=>{t.style.opacity=0;t.style.transform='translate(-50%,-10px)'},700);
+        } else if(verityCount < 1) {
+          endGame();
+        }
+      }
+    } else {
+      elapsed+=dt;
+      const speed=14+Math.min(elapsed*.18,12);
+      distance+=dt*speed*.55;
+      document.querySelector('#distance').textContent=String(Math.floor(distance)).padStart(4,'0');
+      document.querySelector('#speed').textContent=(speed/14).toFixed(1)+'×';
+      document.querySelector('#bar').style.width=(distance%100)+'%';
+
+      const input=(keys.d?1:0)-(keys.a?1:0);
+      velocity=THREE.MathUtils.damp(velocity,input*8.0,5.2,dt);
+      verityArmyGroup.position.x=THREE.MathUtils.clamp(verityArmyGroup.position.x+velocity*dt,-3.8,3.8);
+      verityArmyGroup.position.y=1.05+Math.sin(elapsed*10)*.075;
+      shadow.position.x=verityArmyGroup.position.x;
+
+      spawn-=dt;
+      if(spawn<=0){
+        totalEncountersSpawned++;
+        // 2/5 chance to spawn enemy after first 5, preventing 3 in a row
+        let spawnEnemy = false;
+        if(totalEncountersSpawned > 5 && Math.random() < 2/5) {
+          if(consecutiveEnemies < 2) {
+            spawnEnemy = true;
+            consecutiveEnemies++;
+          } else {
+            consecutiveEnemies = 0;
+          }
+        } else {
+          consecutiveEnemies = 0;
+        }
+
+        if(spawnEnemy) {
+          makeEnemy();
+        } else {
+          makeGatePair();
+        }
+        spawn=Math.max(1.8, 3.4 - elapsed*0.015);
+      }
+
+      // Update gates
+      for(let i=gates.length-1; i>=0; i--){
+        const g=gates[i];
+        g.position.z+=speed*dt;
+
+        if(!g.userData?.checked && g.position.z >= 3.2 && g.position.z <= 4.8) {
+          g.userData.checked = true;
+          g.children.forEach(gateChild => {
+            const gateX = gateChild.position.x + g.position.x;
+            if(Math.abs(verityArmyGroup.position.x - gateX) < 2.5) {
+              const op = gateChild.userData.op;
+              if(op.type === 'add') verityCount += op.val;
+              else if(op.type === 'mul') verityCount = Math.round(verityCount * op.val);
+              else if(op.type === 'sub') verityCount -= op.val;
+              else if(op.type === 'div') verityCount = Math.floor(verityCount / op.val);
+
+              updateArmyMeshes();
+
+              const t = document.querySelector('#toast');
+              t.textContent = `${op.text.toUpperCase()} ARMY!`;
+              t.style.opacity = 1;
+              t.style.transform = 'translate(-50%,0)';
+              setTimeout(()=>{t.style.opacity=0;t.style.transform='translate(-50%,-10px)'},700);
+            }
+          });
+
+          if(verityCount < 1) {
+            endGame();
+          }
+        }
+
+        if(g.position.z > 14){
+          scene.remove(g);
+          gates.splice(i,1);
+        }
+      }
+
+      // Update enemies
+      for(let i=enemies.length-1; i>=0; i--){
+        const en=enemies[i];
+        en.position.z+=speed*dt;
+
+        if(!en.userData.triggered && en.position.z >= 3.2 && en.position.z <= 4.8) {
+          if(Math.abs(verityArmyGroup.position.x - en.position.x) < 2.2) {
+            en.userData.triggered = true;
+            activeCombatEnemy = en;
+            const t = document.querySelector('#toast');
+            t.textContent = "BATTLE TUNG TUNG SAHUR!";
+            t.style.opacity = 1;
+            t.style.transform = 'translate(-50%,0)';
+            setTimeout(()=>{t.style.opacity=0;t.style.transform='translate(-50%,-10px)'},700);
+          }
+        }
+
+        if(en.position.z > 14){
+          scene.remove(en);
+          enemies.splice(i,1);
+        }
+      }
+
+      for(const s of stripes){s.position.z+=speed*dt;if(s.position.z>15)s.position.z-=110}
+      verityArmyGroup.rotation.y=Math.sin(elapsed*2)*.035;
+    }
+
+  } else {
+    verityArmyGroup.position.y=1.05+Math.sin(performance.now()*.0017)*.07;
+    verityArmyGroup.rotation.y=Math.sin(performance.now()*.0007)*.07;
+  }
+
+  // Update Verity Army Counter HUD
+  const vector = new THREE.Vector3(verityArmyGroup.position.x, verityArmyGroup.position.y + 0.9, verityArmyGroup.position.z);
+  vector.project(camera);
+  const px = (vector.x * .5 + .5) * innerWidth;
+  const py = (-(vector.y * .5) + .5) * innerHeight;
+  const counterEl = document.querySelector('#army-counter');
+  counterEl.style.left = `${px}px`;
+  counterEl.style.top = `${py}px`;
+  counterEl.textContent = verityCount;
+  counterEl.style.display = activeCombatEnemy ? 'none' : 'block';
+
+  // Update Tung Tung Sahur Army Counter HUD
+  let targetEnemy = activeCombatEnemy;
+  if(!targetEnemy && enemies.length > 0) {
+    let closest = null;
+    let minZ = 999;
+    for(const en of enemies) {
+      if(en.position.z <= 10 && en.position.z >= -25) {
+        if(en.position.z < minZ) {
+          minZ = en.position.z;
+          closest = en;
+        }
+      }
+    }
+    targetEnemy = closest;
+  }
+
+  const enemyCounterEl = document.querySelector('#enemy-counter');
+  if(targetEnemy && running) {
+    enemyCounterEl.style.display = 'block';
+    const eVector = new THREE.Vector3(targetEnemy.position.x, targetEnemy.position.y + 1.8, targetEnemy.position.z);
+    eVector.project(camera);
+    const epx = (eVector.x * .5 + .5) * innerWidth;
+    const epy = (-(eVector.y * .5) + .5) * innerHeight;
+    enemyCounterEl.style.left = `${epx}px`;
+    enemyCounterEl.style.top = `${epy}px`;
+    enemyCounterEl.textContent = targetEnemy.userData.enemyCount;
+  } else {
+    enemyCounterEl.style.display = 'none';
+  }
+
+  renderer.render(scene,camera);
+}
+animate();
+
+addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)});
+</script>
+</body>
+</html>
